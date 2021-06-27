@@ -1,4 +1,4 @@
-# VoiceFalloffOverride
+# Voice Falloff Override
 ### A VRChat mod for MelonLoader by Adnezz
 
 Built against and tested with MelonLoader v0.4, and VRChat Build 1108.
