@@ -36,7 +36,9 @@ Public_Void_PDM_0 <- Appears to make the audio go world space?
 
 
 using MelonLoader;
+using System;
 using System.Collections;
+using Il2CppSystem.Collections.Generic;
 using UnityEngine;
 using VRC;
 using VRC.Core;
@@ -49,20 +51,33 @@ namespace VoiceFalloffOverride
         public const string Name = "Voice Falloff Override";
         public const string Author = "Adnezz";
         public const string Company = null;
-        public const string Version = "0.01";
+        public const string Version = "0.1";
         public const string DownloadLink = "https://github.com/Adnezz/VoiceFalloffOverride";
     }
 
     public class VoiceFalloffOverrideMod : MelonMod
     {
 
+        public static int WorldType = 10;
+        public static float DefaultVoiceRange = 25;
+        public static bool Initializing = true;
+        public static bool Enabled = true;
+        public static float VoiceRange = 25;
 
+        
+        //0: Unblocked
+        //1: Club World, Range can only be lowered
+        //2: Game World, Mod Disabled
+        //3: Emm Website Blacklisted, Mod Disabled
+        //4: Emm GameObject Blacklisted, Mod Disabled
+        //10: Not checked yet.
 
         public override void OnApplicationStart()
         {
             MelonPreferences.CreateCategory("VFO", "Voice Falloff Override");
             MelonPreferences.CreateEntry("VFO", "Enabled", true, "VFO Enabled", false);
             MelonPreferences.CreateEntry<float>("VFO", "Distance", 25, "Falloff Distance", false);
+            Enabled = MelonPreferences.GetEntryValue<bool>("VFO", "Enabled");
             MelonCoroutines.Start(Initialize());
         }
 
@@ -76,41 +91,110 @@ namespace VoiceFalloffOverride
             NetworkManagerHooks.OnJoin += OnPlayerJoined;
         }
 
+        public override void OnSceneWasLoaded(int buildIndex, string sceneName)
+        {
+            switch (buildIndex)
+            {
+                case -1:
+                    WorldType = 10;
+                    Initializing = true;
+                    MelonCoroutines.Start(Utilities.CheckWorld());
+                    MelonCoroutines.Start(Utilities.SampleFalloffRange());
+                    break;
+                case 0:
+                case 1:
+                    break;
+                default:
+                    break;
+                    
+            }
+        }
+
         private void OnPlayerJoined(Player player)
         {
-            if (player != null || player.field_Private_APIUser_0 != null)
+            if ((WorldType < 2) && !Initializing && Enabled)
             {
-                UpdatePlayerVolume(player);
+                if (player != null || player.field_Private_APIUser_0 != null)
+                {
+                    UpdatePlayerVolume(player, GetRange());
+                }
             }
         }
 
         public override void OnPreferencesSaved()
         {
+            bool update = false;
+            if (Enabled != MelonPreferences.GetEntryValue<bool>("VFO", "Enabled"))
+            {
+                Enabled = MelonPreferences.GetEntryValue<bool>("VFO", "Enabled");
+                update = true;
+            }
+            if (VoiceRange != MelonPreferences.GetEntryValue<float>("VFO", "Distance"))
+            {
+                VoiceRange = MelonPreferences.GetEntryValue<float>("VFO", "Distance");
+                update = true;
+            }
+            if (WorldType < 2 && !Initializing & update)
+                UpdateAllPlayerVolumes();
+
+        }
+
+
+
+        public static void UpdateAllPlayerVolumes()
+        {
             var Players = PlayerManager.field_Private_Static_PlayerManager_0.field_Private_List_1_Player_0;
+            float range = GetRange();
+            
             for (int i = 0; i < Players.Count; i++)
             {
                 Player player = Players[i];
-                if(player != null || player.field_Private_APIUser_0 != null)
+                if (player != null || player.field_Private_APIUser_0 != null)
                 {
-                    UpdatePlayerVolume(player);
-                    
+                    UpdatePlayerVolume(player, range);
                 }
             }
         }
 
-        private void UpdatePlayerVolume(Player player)
+        private static float GetRange()
         {
-            if (MelonPreferences.GetEntryValue<bool>("VFO", "Enabled"))
+            //float DesiredRange = MelonPreferences.GetEntryValue<float>("VFO", "Distance");
+            float ResultRange;
+            if (Enabled)
             {
-                player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_1 = MelonPreferences.GetEntryValue<float>("VFO", "Distance");
+                switch (WorldType)
+                {
+                    case 0:
+                        ResultRange = VoiceRange;
+                        break;
+                    case 1:
+                        if (VoiceRange < DefaultVoiceRange)
+                            ResultRange = VoiceRange;
+                        else
+                            ResultRange = DefaultVoiceRange;
+                        break;
+                    default:
+                        //Shouldn't ever get here, but just in case.
+                        ResultRange = DefaultVoiceRange;
+                        break;
+                }
             }
             else
             {
-                //TODO: Restore some original value here.
-                player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_1 = 25;
+                ResultRange = DefaultVoiceRange;
             }
+            MelonLogger.Msg($"Range Set: {ResultRange.ToString()}");
+            return ResultRange;
+        }
+
+        private static void UpdatePlayerVolume(Player player, float range)
+        {
+            player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_1 = range;
             player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.Method_Private_Void_0(); //Apply Changes?
         }
+
+
+        
 
 
 
