@@ -23,6 +23,8 @@ If you have UIExpansionKit, you can enable the mod and change the set falloff di
 
 Otherwise, after running VRChat with the mod installed for the first time, you can edit the falloff distance in VRChat/UserData/MelonPreferences.cfg under the VFO header.
 
+This mod will not function in Game worlds or worlds on emmvrc's blacklist. In worlds with the club tag, you may only reduce the falloff range from the world's default, not increase it.
+
 
 ## Credit
 This mod was built up from dave-kun's [RankVolumeControl](https://github.com/dave-kun/RankVolumeControl) and uses NetworkManagerHooks.cs from Knah's [JoinNotifier](https://github.com/knah/VRCMods/tree/master/JoinNotifier)
