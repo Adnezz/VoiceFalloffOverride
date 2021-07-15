@@ -8,6 +8,34 @@ using VRC.Core;
 
 namespace VoiceFalloffOverride
 {
+    public class distValidator : MelonLoader.Preferences.ValueValidator
+    {
+        public override object EnsureValid(object value)
+        {
+            if (value is float)
+            {
+                if ((float)value >= 0)
+                {
+                    return value;
+                }
+                else return new float();
+            }
+            else return new float();
+        }
+
+        public override bool IsValid(object value)
+        {
+            if (value is float)
+            {
+                if ((float)value >= 0)
+                {
+                    return true;
+                }
+                else return false;
+            }
+            else return false;
+        }
+    }
     class Utilities
     {
         //Borrowed parts from https://github.com/loukylor/VRC-Mods/blob/main/VRChatUtilityKit/Utilities/VRCUtils.cs
@@ -35,8 +63,9 @@ namespace VoiceFalloffOverride
 
             if (checkedWorlds.ContainsKey(worldId))
             {
-                VoiceFalloffOverrideMod.WorldType = checkedWorlds[worldId];
-                MelonLogger.Msg($"Using cached check {checkedWorlds[worldId]} for world '{worldId}'");
+                VoiceFalloffOverrideMod.WorldType = checkedWorlds.get_Item(worldId);
+                    //checkedWorlds[worldId];
+                MelonLogger.Msg($"Using cached check {checkedWorlds.get_Item(worldId)} for world '{worldId}'");
                 yield break;
             }
 
@@ -99,7 +128,7 @@ namespace VoiceFalloffOverride
                             short tagResult = 0;
                             foreach (var worldTag in apiWorld.tags)
                             {
-                                if (worldTag.IndexOf("game", StringComparison.OrdinalIgnoreCase) != -1)
+                                if (worldTag.IndexOf("game", StringComparison.OrdinalIgnoreCase) != -1 && worldTag.IndexOf("games", StringComparison.OrdinalIgnoreCase) == -1)
                                 {
                                     tagResult = 2;
                                     //MelonLogger.Msg($"Found game tag in world world '{worldId}'");
@@ -123,14 +152,18 @@ namespace VoiceFalloffOverride
 
         internal static IEnumerator SampleFalloffRange()
         {
-            while (VoiceFalloffOverrideMod.WorldType == 10)
+            while (VoiceFalloffOverrideMod.WorldType == 10 || VRCPlayer.field_Internal_Static_VRCPlayer_0 == null)
                 yield return new WaitForSecondsRealtime(1);
+            VoiceFalloffOverrideMod.DefaultGain = VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_0;
             VoiceFalloffOverrideMod.DefaultVoiceRange = VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_1;
+            VoiceFalloffOverrideMod.DefaultNearRange = VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_2;
             MelonLogger.Msg($"World Type: {VoiceFalloffOverrideMod.WorldType}, Default Range: {VoiceFalloffOverrideMod.DefaultVoiceRange}");
             if (VoiceFalloffOverrideMod.WorldType < 2 && VoiceFalloffOverrideMod.Enabled)
                 VoiceFalloffOverrideMod.UpdateAllPlayerVolumes();
             VoiceFalloffOverrideMod.Initializing = false;
             yield break;
         }
+
+        
     }
 }

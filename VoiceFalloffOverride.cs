@@ -51,19 +51,29 @@ namespace VoiceFalloffOverride
         public const string Name = "Voice Falloff Override";
         public const string Author = "Adnezz";
         public const string Company = null;
-        public const string Version = "0.1";
+        public const string Version = "0.2";
         public const string DownloadLink = "https://github.com/Adnezz/VoiceFalloffOverride";
     }
 
+    
+
     public class VoiceFalloffOverrideMod : MelonMod
     {
+        public static distValidator dval;
 
-        public static int WorldType = 10;
-        public static float DefaultVoiceRange = 25;
-        public static bool Initializing = true;
         public static bool Enabled = true;
-        public static float VoiceRange = 25;
+        public static bool Initializing = true;
+        public static int WorldType = 10;
 
+        public static float DefaultVoiceRange = 25;
+        public static float DefaultNearRange = 0;
+        public static float DefaultGain = 15;
+        
+        public static float VoiceRange = 25;
+        public static float VoiceNearRange = 0;
+        public static float VoiceGain = 15;
+        
+        
         
         //0: Unblocked
         //1: Club World, Range can only be lowered
@@ -75,11 +85,22 @@ namespace VoiceFalloffOverride
         public override void OnApplicationStart()
         {
             MelonPreferences.CreateCategory("VFO", "Voice Falloff Override");
-            MelonPreferences.CreateEntry("VFO", "Enabled", true, "VFO Enabled", false);
-            MelonPreferences.CreateEntry<float>("VFO", "Distance", 25, "Falloff Distance", false);
+            MelonPreferences.CreateEntry("VFO", "Enabled", false, "VFO Enabled");
+            MelonPreferences.CreateEntry<float>("VFO", "Distance", 25, "Falloff Distance", "Range in meters where volume reaches 0%");//, false, false, dval);
+            MelonPreferences.CreateEntry<float>("VFO", "NearDistance", 0, "Falloff Start Distance", "Range in meters where volume begins dropping off");//, false, false, dval);
+            MelonPreferences.CreateEntry<float>("VFO", "Gain", 15, "Gain", "Gain adjustment. Default: 15");//, false, false, dval);
+
+
             Enabled = MelonPreferences.GetEntryValue<bool>("VFO", "Enabled");
+            VoiceRange = MelonPreferences.GetEntryValue<float>("VFO", "Distance");
+            VoiceNearRange = MelonPreferences.GetEntryValue<float>("VFO", "NearDistance");
+            VoiceGain = MelonPreferences.GetEntryValue<float>("VFO", "Gain");
+
+
+
             MelonCoroutines.Start(Initialize());
         }
+        
 
         private IEnumerator Initialize()
         {
@@ -116,7 +137,7 @@ namespace VoiceFalloffOverride
             {
                 if (player != null || player.field_Private_APIUser_0 != null)
                 {
-                    UpdatePlayerVolume(player, GetRange());
+                    UpdatePlayerVolume(player, GetFarRange(), GetNearRange(), GetGain());
                 }
             }
         }
@@ -129,9 +150,19 @@ namespace VoiceFalloffOverride
                 Enabled = MelonPreferences.GetEntryValue<bool>("VFO", "Enabled");
                 update = true;
             }
-            if (VoiceRange != MelonPreferences.GetEntryValue<float>("VFO", "Distance"))
+            if (Math.Abs(VoiceRange - MelonPreferences.GetEntryValue<float>("VFO", "Distance")) > 0.01)
             {
                 VoiceRange = MelonPreferences.GetEntryValue<float>("VFO", "Distance");
+                update = true;
+            }
+            if (Math.Abs(VoiceNearRange - MelonPreferences.GetEntryValue<float>("VFO", "NearDistance")) > 0.01)
+            {
+                VoiceNearRange = MelonPreferences.GetEntryValue<float>("VFO", "NearDistance");
+                update = true;
+            }
+            if (Math.Abs(VoiceGain - MelonPreferences.GetEntryValue<float>("VFO", "Gain")) > 0.01)
+            {
+                VoiceGain = MelonPreferences.GetEntryValue<float>("VFO", "Gain");
                 update = true;
             }
             if (WorldType < 2 && !Initializing & update)
@@ -144,19 +175,21 @@ namespace VoiceFalloffOverride
         public static void UpdateAllPlayerVolumes()
         {
             var Players = PlayerManager.field_Private_Static_PlayerManager_0.field_Private_List_1_Player_0;
-            float range = GetRange();
+            float far_range = GetFarRange();
+            float near_range = GetNearRange();
+            float gain = GetGain();
             
             for (int i = 0; i < Players.Count; i++)
             {
-                Player player = Players[i];
+                Player player = Players.get_Item(i);//Players[i];
                 if (player != null || player.field_Private_APIUser_0 != null)
                 {
-                    UpdatePlayerVolume(player, range);
+                    UpdatePlayerVolume(player, far_range, near_range, gain);
                 }
             }
         }
 
-        private static float GetRange()
+        private static float GetFarRange()
         {
             //float DesiredRange = MelonPreferences.GetEntryValue<float>("VFO", "Distance");
             float ResultRange;
@@ -183,14 +216,78 @@ namespace VoiceFalloffOverride
             {
                 ResultRange = DefaultVoiceRange;
             }
-            MelonLogger.Msg($"Range Set: {ResultRange.ToString()}");
+            //MelonLogger.Msg($"Range Set: {ResultRange.ToString()}");
             return ResultRange;
         }
 
-        private static void UpdatePlayerVolume(Player player, float range)
+        private static float GetNearRange()
         {
-            player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_1 = range;
-            player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.Method_Private_Void_0(); //Apply Changes?
+            //float DesiredRange = MelonPreferences.GetEntryValue<float>("VFO", "Distance");
+            float ResultRange;
+            if (Enabled)
+            {
+                switch (WorldType)
+                {
+                    case 0:
+                        ResultRange = VoiceNearRange;
+                        break;
+                    case 1:
+                        if (VoiceNearRange < DefaultVoiceRange) //Allow increasing near rage to match max range.
+                            ResultRange = VoiceNearRange;
+                        else
+                            ResultRange = DefaultVoiceRange;
+                        break;
+                    default:
+                        //Shouldn't ever get here, but just in case.
+                        ResultRange = DefaultNearRange;
+                        break;
+                }
+            }
+            else
+            {
+                ResultRange = DefaultNearRange;
+            }
+            //MelonLogger.Msg($"Range Set: {ResultRange.ToString()}");
+            return ResultRange;
+        }
+
+        private static float GetGain()
+        {
+            //float DesiredRange = MelonPreferences.GetEntryValue<float>("VFO", "Distance");
+            float ResultRange;
+            if (Enabled)
+            {
+                switch (WorldType)
+                {
+                    case 0:
+                        ResultRange = VoiceGain;
+                        break;
+                    case 1:
+                        if (VoiceGain > DefaultGain)
+                            ResultRange = VoiceGain;
+                        else
+                            ResultRange = DefaultGain;
+                        break;
+                    default:
+                        //Shouldn't ever get here, but just in case.
+                        ResultRange = DefaultGain;
+                        break;
+                }
+            }
+            else
+            {
+                ResultRange = DefaultGain;
+            }
+            //MelonLogger.Msg($"Range Set: {ResultRange.ToString()}");
+            return ResultRange;
+        }
+
+        private static void UpdatePlayerVolume(Player player, float far_range, float near_range, float gain)
+        {
+            player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_0 = gain;
+            player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_1 = far_range;
+            player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_2 = near_range;
+            player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.Method_Private_Void_1(); //Apply Changes?
         }
 
 
