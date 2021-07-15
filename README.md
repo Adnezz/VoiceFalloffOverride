@@ -1,9 +1,9 @@
 # Voice Falloff Override
 ### A VRChat mod for MelonLoader by Adnezz
 
-Built against and tested with MelonLoader v0.4, and VRChat Build 1108.
+Built against and tested with MelonLoader v0.4.1, and VRChat Build 1114.
 
-Allows local customization of the max distance value on player voices, AKA: the voice falloff distance.  
+Allows local customization of the distance values on player voices, AKA: the voice falloff distance.  
 Does NOT change how far other players hear voices travel, only changes what you hear.
 
 ## Background
