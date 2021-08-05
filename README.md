@@ -1,10 +1,12 @@
 # Voice Falloff Override
 ### A VRChat mod for MelonLoader by Adnezz
 
-Built against and tested with MelonLoader v0.4.1, and VRChat Build 1114.
+Built against and tested with MelonLoader v0.4.3, and VRChat Build 1121.
 
 Allows local customization of the distance values on player voices, AKA: the voice falloff distance.  
 Does NOT change how far other players hear voices travel, only changes what you hear.
+
+Also includes a fix for voice spatialization. A recent VRChat update disabled spatial audio on avatar voices, making voices very hard to localize in a crowd.
 
 ## Background
 I wrote this because I often felt like I was drowning in voices when hanging out in a crowd in VRChat. I can't tell for certain, but it feels like voice localization and falloff has taken a turn for the worse over recent updates. With this mod, I can lower the distance and stay focused on the conversation I'm having with the people immediately around me.
@@ -14,7 +16,7 @@ Could also be used for people in particularly large avatars, so they can hear pe
 
 
 ## Requirements
-* MelonLoader v0.4
+* MelonLoader v0.4.3
 * UIExpansionKit is recommended.
 
 ## Use
