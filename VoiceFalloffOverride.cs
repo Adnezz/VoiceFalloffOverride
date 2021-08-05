@@ -67,7 +67,7 @@ namespace VoiceFalloffOverride
 
         public static bool Enabled = true;
         public static bool Initializing = true;
-        public static bool Spatialize = false;
+        public static bool Spatialize = true;
         public static bool HasBPAC = false;
         public static GameObject BPAC;
         public static int WorldType
@@ -95,7 +95,7 @@ namespace VoiceFalloffOverride
             MelonPreferences.CreateEntry<float>("VFO", "Distance", 25, "Falloff Distance", "Range in meters where volume reaches 0%");//, false, false, dval);
             MelonPreferences.CreateEntry<float>("VFO", "NearDistance", 0, "Falloff Start Distance", "Range in meters where volume begins dropping off");//, false, false, dval);
             MelonPreferences.CreateEntry<float>("VFO", "Gain", 15, "Gain", "Gain adjustment. Default: 15");//, false, false, dval);
-            MelonPreferences.CreateEntry("VFO", "Spatialize", false, "Fix Voice Spatialization");
+            MelonPreferences.CreateEntry("VFO", "Spatialize", true, "Fix Voice Spatialization");
 
             Enabled = MelonPreferences.GetEntryValue<bool>("VFO", "Enabled");
             VoiceRange = MelonPreferences.GetEntryValue<float>("VFO", "Distance");
