@@ -1,14 +1,16 @@
-﻿using MelonLoader;
-using System;
-using System.Collections;
-using Il2CppSystem.Collections.Generic;
+﻿using System;
+using MelonLoader;
 using UnityEngine;
-using VRC;
+using UnityEngine.Networking;
 using VRC.Core;
+
+
+using SIDictionary = System.Collections.Generic.Dictionary<string, int>;
+
 
 namespace VoiceFalloffOverride
 {
-    public class distValidator : MelonLoader.Preferences.ValueValidator
+    /*public class distValidator : MelonLoader.Preferences.ValueValidator
     {
         public override object EnsureValid(object value)
         {
@@ -35,15 +37,24 @@ namespace VoiceFalloffOverride
             }
             else return false;
         }
-    }
+    }*/
     class Utilities
     {
         //Borrowed parts from https://github.com/loukylor/VRC-Mods/blob/main/VRChatUtilityKit/Utilities/VRCUtils.cs
         //And also https://github.com/Psychloor/PlayerRotater/blob/master/PlayerRotater/Utilities.cs
 
         private static bool alreadyCheckingWorld;
-        private static Dictionary<string, int> checkedWorlds = new Dictionary<string, int>();
-        internal static IEnumerator CheckWorld()
+         
+        private static SIDictionary checkedWorlds = new SIDictionary();
+
+
+        //0: Unblocked
+        //1: Club World, Range can only be lowered
+        //2: Game World, Mod Disabled
+        //3: Emm Website Blacklisted, Mod Disabled
+        //4: Emm GameObject Blacklisted, Mod Disabled
+        //10: Not checked yet.
+        internal static System.Collections.IEnumerator CheckWorld()
         {
             if (alreadyCheckingWorld)
             {
@@ -51,21 +62,25 @@ namespace VoiceFalloffOverride
                 yield break;
             }
 
-
+            //Wait for RoomManager to exist before continuing.
             ApiWorld currentWorld = null;
             while (currentWorld == null)
             {
                 currentWorld = RoomManager.field_Internal_Static_ApiWorld_0;
                 yield return new WaitForSecondsRealtime(1);
             }
+
+
             var worldId = currentWorld.id;
             MelonLogger.Msg($"Checking World with Id {worldId}");
 
+            //Check cache for world, so we keep the number of API calls lower.
             if (checkedWorlds.ContainsKey(worldId))
             {
-                VoiceFalloffOverrideMod.WorldType = checkedWorlds.get_Item(worldId);
+                checkedWorlds.TryGetValue(worldId, out int outres);
+                VoiceFalloffOverrideMod.WorldType = outres;
                     //checkedWorlds[worldId];
-                MelonLogger.Msg($"Using cached check {checkedWorlds.get_Item(worldId)} for world '{worldId}'");
+                MelonLogger.Msg($"Using cached check {VoiceFalloffOverrideMod.WorldType} for world '{worldId}'");
                 yield break;
             }
 
@@ -80,20 +95,20 @@ namespace VoiceFalloffOverride
             else if (GameObject.Find("eVRCRiskFuncDisable") != null)
             {
                 VoiceFalloffOverrideMod.WorldType = 4;
-                checkedWorlds.Add(worldId, 4);
+                checkedWorlds.Add(worldId, 0);
                 yield break;
             }
 
             alreadyCheckingWorld = true;
 
             // Check if black/whitelisted from EmmVRC - thanks Emilia and the rest of EmmVRC Staff
-            var www = new WWW($"https://dl.emmvrc.com/riskyfuncs.php?worldid={worldId}", null, new Dictionary<string, string>());
-
-            while (!www.isDone)
+            var uwr = UnityWebRequest.Get($"https://dl.emmvrc.com/riskyfuncs.php?worldid={worldId}");
+            uwr.SendWebRequest();
+            while (!uwr.isDone)
                 yield return new WaitForEndOfFrame();
 
-            var result = www.text?.Trim().ToLower();
-            www.Dispose();
+            var result = uwr.downloadHandler.text?.Trim().ToLower();
+            uwr.Dispose();
             if (!string.IsNullOrWhiteSpace(result))
             {
                 switch (result)
@@ -102,14 +117,14 @@ namespace VoiceFalloffOverride
                         VoiceFalloffOverrideMod.WorldType = 0;
                         checkedWorlds.Add(worldId, 0);
                         alreadyCheckingWorld = false;
-                        MelonLogger.Msg($"EmmVRC allows world '{worldId}'");
+                        //MelonLogger.Msg($"EmmVRC allows world '{worldId}'");
                         yield break;
 
                     case "denied":
-                        VoiceFalloffOverrideMod.WorldType = 3;
-                        checkedWorlds.Add(worldId, 3);
+                        VoiceFalloffOverrideMod.WorldType = 4;
+                        checkedWorlds.Add(worldId, 0);
                         alreadyCheckingWorld = false;
-                        MelonLogger.Msg($"EmmVRC denies world '{worldId}'");
+                        //MelonLogger.Msg($"EmmVRC denies world '{worldId}'");
                         yield break;
                 }
             } 
@@ -150,17 +165,27 @@ namespace VoiceFalloffOverride
                 disableCache: false);
         }
 
-        internal static IEnumerator SampleFalloffRange()
+        internal static System.Collections.IEnumerator SampleFalloffRange()
         {
+            //Wait for world type to populate and local player to exist.
             while (VoiceFalloffOverrideMod.WorldType == 10 || VRCPlayer.field_Internal_Static_VRCPlayer_0 == null)
-                yield return new WaitForSecondsRealtime(1);
-            VoiceFalloffOverrideMod.DefaultGain = VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_0;
-            VoiceFalloffOverrideMod.DefaultVoiceRange = VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_1;
-            VoiceFalloffOverrideMod.DefaultNearRange = VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_2;
-            MelonLogger.Msg($"World Type: {VoiceFalloffOverrideMod.WorldType}, Default Range: {VoiceFalloffOverrideMod.DefaultVoiceRange}");
-            if (VoiceFalloffOverrideMod.WorldType < 2 && VoiceFalloffOverrideMod.Enabled)
-                VoiceFalloffOverrideMod.UpdateAllPlayerVolumes();
-            VoiceFalloffOverrideMod.Initializing = false;
+                yield return new WaitForSecondsRealtime(2);
+
+            //Assign values at start of world as default.
+
+            var BPAC = GameObject.Find("BetterPlayerAudioController");
+            if (BPAC != null)
+            {
+                VoiceFalloffOverrideMod.HasBPAC = true;
+                VoiceFalloffOverrideMod.BPAC = BPAC;
+                MelonLogger.Msg("Found BetterPlayerAudioController in this world.");
+            }
+
+
+            var PAM = VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_PlayerAudioManager_0;
+            VoiceFalloffOverrideMod.SetWorldDefaultParameters(PAM.field_Private_Single_2, PAM.field_Private_Single_1, PAM.field_Private_Single_0);
+            VoiceFalloffOverrideMod.FinishInit();
+            
             yield break;
         }
 

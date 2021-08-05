@@ -37,7 +37,9 @@ Public_Void_PDM_0 <- Appears to make the audio go world space?
 
 using MelonLoader;
 using System;
+using System.Linq;
 using System.Collections;
+using System.Reflection;
 using Il2CppSystem.Collections.Generic;
 using UnityEngine;
 using VRC;
@@ -51,7 +53,7 @@ namespace VoiceFalloffOverride
         public const string Name = "Voice Falloff Override";
         public const string Author = "Adnezz";
         public const string Company = null;
-        public const string Version = "0.2";
+        public const string Version = "0.3";
         public const string DownloadLink = "https://github.com/Adnezz/VoiceFalloffOverride";
     }
 
@@ -59,11 +61,20 @@ namespace VoiceFalloffOverride
 
     public class VoiceFalloffOverrideMod : MelonMod
     {
-        public static distValidator dval;
+        private static int _WorldType = 10;
+
+        //public static distValidator dval;
 
         public static bool Enabled = true;
         public static bool Initializing = true;
-        public static int WorldType = 10;
+        public static bool Spatialize = false;
+        public static bool HasBPAC = false;
+        public static GameObject BPAC;
+        public static int WorldType
+        {
+            get { return _WorldType; }
+            set { _WorldType = value; }
+        }
 
         public static float DefaultVoiceRange = 25;
         public static float DefaultNearRange = 0;
@@ -75,12 +86,7 @@ namespace VoiceFalloffOverride
         
         
         
-        //0: Unblocked
-        //1: Club World, Range can only be lowered
-        //2: Game World, Mod Disabled
-        //3: Emm Website Blacklisted, Mod Disabled
-        //4: Emm GameObject Blacklisted, Mod Disabled
-        //10: Not checked yet.
+        
 
         public override void OnApplicationStart()
         {
@@ -89,12 +95,19 @@ namespace VoiceFalloffOverride
             MelonPreferences.CreateEntry<float>("VFO", "Distance", 25, "Falloff Distance", "Range in meters where volume reaches 0%");//, false, false, dval);
             MelonPreferences.CreateEntry<float>("VFO", "NearDistance", 0, "Falloff Start Distance", "Range in meters where volume begins dropping off");//, false, false, dval);
             MelonPreferences.CreateEntry<float>("VFO", "Gain", 15, "Gain", "Gain adjustment. Default: 15");//, false, false, dval);
-
+            MelonPreferences.CreateEntry("VFO", "Spatialize", false, "Fix Voice Spatialization");
 
             Enabled = MelonPreferences.GetEntryValue<bool>("VFO", "Enabled");
             VoiceRange = MelonPreferences.GetEntryValue<float>("VFO", "Distance");
             VoiceNearRange = MelonPreferences.GetEntryValue<float>("VFO", "NearDistance");
             VoiceGain = MelonPreferences.GetEntryValue<float>("VFO", "Gain");
+            Spatialize = MelonPreferences.GetEntryValue<bool>("VFO", "Spatialize");
+
+            //foreach (MethodInfo method in typeof(PlayerAudioManager).Get) //.GetMethods().Where(mein => mein.Name.StartsWith("Method_Private_Void"))
+            //{
+            //    typeof(PlayerAudioManager).GetRuntimeMethod().
+            //    XrefIn
+            //}
 
 
 
@@ -104,7 +117,7 @@ namespace VoiceFalloffOverride
 
         private IEnumerator Initialize()
         {
-            while (ReferenceEquals(NetworkManager.field_Internal_Static_NetworkManager_0, null))
+            while (NetworkManager.field_Internal_Static_NetworkManager_0 is null)
                 yield return null;
 
             MelonLogger.Msg("Initializing Voice Falloff Override.");
@@ -117,8 +130,9 @@ namespace VoiceFalloffOverride
             switch (buildIndex)
             {
                 case -1:
-                    WorldType = 10;
+                    _WorldType = 10;
                     Initializing = true;
+                    HasBPAC = false;
                     MelonCoroutines.Start(Utilities.CheckWorld());
                     MelonCoroutines.Start(Utilities.SampleFalloffRange());
                     break;
@@ -133,11 +147,15 @@ namespace VoiceFalloffOverride
 
         private void OnPlayerJoined(Player player)
         {
-            if ((WorldType < 2) && !Initializing && Enabled)
+            if (!Initializing)
             {
                 if (player != null || player.field_Private_APIUser_0 != null)
                 {
-                    UpdatePlayerVolume(player, GetFarRange(), GetNearRange(), GetGain());
+                    if (Spatialize) UpdatePlayerSpatialization(player, true);
+                    if ((_WorldType < 2) && Enabled)
+                    {
+                        UpdatePlayerVolume(player, GetFarRange(), GetNearRange(), GetGain());
+                    }
                 }
             }
         }
@@ -149,6 +167,11 @@ namespace VoiceFalloffOverride
             {
                 Enabled = MelonPreferences.GetEntryValue<bool>("VFO", "Enabled");
                 update = true;
+            }
+            if (Spatialize != MelonPreferences.GetEntryValue<bool>("VFO", "Spatialize"))
+            {
+                Spatialize = MelonPreferences.GetEntryValue<bool>("VFO", "Spatialize");
+                if (!Initializing) UpdateAllPlayerSpatializations();
             }
             if (Math.Abs(VoiceRange - MelonPreferences.GetEntryValue<float>("VFO", "Distance")) > 0.01)
             {
@@ -165,9 +188,29 @@ namespace VoiceFalloffOverride
                 VoiceGain = MelonPreferences.GetEntryValue<float>("VFO", "Gain");
                 update = true;
             }
+
             if (WorldType < 2 && !Initializing & update)
                 UpdateAllPlayerVolumes();
 
+        }
+
+        public static void FinishInit()
+        {
+            MelonLogger.Msg($"World Type: {WorldType}, Default Range: {DefaultVoiceRange}");
+
+
+            //Apply voice ranges.
+            if (WorldType < 2 && Enabled)
+                UpdateAllPlayerVolumes();
+            if (Spatialize) UpdateAllPlayerSpatializations();
+            Initializing = false;
+        }
+
+        public static void SetWorldDefaultParameters(float min, float max, float gain)
+        {
+            VoiceRange = max;
+            VoiceNearRange = min;
+            VoiceGain = gain;
         }
 
 
@@ -178,13 +221,34 @@ namespace VoiceFalloffOverride
             float far_range = GetFarRange();
             float near_range = GetNearRange();
             float gain = GetGain();
-            
+
+            if (HasBPAC)
+            {
+                //MelonLogger.Msg($"Attempting to {(Enabled ? "disable" : "re-enable")} component...");
+                BPAC.active = !Enabled;
+            }
+
+
             for (int i = 0; i < Players.Count; i++)
             {
-                Player player = Players.get_Item(i);//Players[i];
+                
+                Player player = Players.System_Collections_IList_get_Item(i).Cast<Player>();
                 if (player != null || player.field_Private_APIUser_0 != null)
                 {
                     UpdatePlayerVolume(player, far_range, near_range, gain);
+                }
+            }
+        }
+
+        public static void UpdateAllPlayerSpatializations()
+        {
+            var Players = PlayerManager.field_Private_Static_PlayerManager_0.field_Private_List_1_Player_0;
+            for (int i = 0; i < Players.Count; i++)
+            {
+                Player player = Players.System_Collections_IList_get_Item(i).Cast<Player>();//Players[i];
+                if (player != null || player.field_Private_APIUser_0 != null)
+                {
+                    UpdatePlayerSpatialization(player, Spatialize);
                 }
             }
         }
@@ -195,7 +259,7 @@ namespace VoiceFalloffOverride
             float ResultRange;
             if (Enabled)
             {
-                switch (WorldType)
+                switch (_WorldType)
                 {
                     case 0:
                         ResultRange = VoiceRange;
@@ -226,7 +290,7 @@ namespace VoiceFalloffOverride
             float ResultRange;
             if (Enabled)
             {
-                switch (WorldType)
+                switch (_WorldType)
                 {
                     case 0:
                         ResultRange = VoiceNearRange;
@@ -257,7 +321,7 @@ namespace VoiceFalloffOverride
             float ResultRange;
             if (Enabled)
             {
-                switch (WorldType)
+                switch (_WorldType)
                 {
                     case 0:
                         ResultRange = VoiceGain;
@@ -282,12 +346,30 @@ namespace VoiceFalloffOverride
             return ResultRange;
         }
 
+        
+
         private static void UpdatePlayerVolume(Player player, float far_range, float near_range, float gain)
         {
+            AudioSource audio = player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_AudioSource_0;
+            ONSPAudioSource a2 = audio.gameObject.GetComponent<USpeaker>().field_Private_ONSPAudioSource_0;
+            audio.minDistance = near_range;
+            audio.maxDistance = far_range;
+            a2.far = far_range;
+            a2.near = near_range;
+            a2.gain = gain;
+            //a2.enableSpatialization = Enabled & Spatialize;
+
             player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_0 = gain;
             player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_1 = far_range;
             player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_Single_2 = near_range;
-            player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.Method_Private_Void_1(); //Apply Changes?
+            //player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.Method_Private_Void_1(); //Apply Changes?
+        }
+
+        private static void UpdatePlayerSpatialization(Player player, bool spatialize)
+        {
+            AudioSource audio = player.prop_VRCPlayer_0.prop_PlayerAudioManager_0.field_Private_AudioSource_0;
+            ONSPAudioSource a2 = audio.gameObject.GetComponent<USpeaker>().field_Private_ONSPAudioSource_0;
+            a2.enableSpatialization = spatialize;
         }
 
 
