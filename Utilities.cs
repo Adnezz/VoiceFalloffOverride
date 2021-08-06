@@ -95,7 +95,7 @@ namespace VoiceFalloffOverride
             else if (GameObject.Find("eVRCRiskFuncDisable") != null)
             {
                 VoiceFalloffOverrideMod.WorldType = 4;
-                checkedWorlds.Add(worldId, 0);
+                checkedWorlds.Add(worldId, 4);
                 yield break;
             }
 
@@ -121,8 +121,8 @@ namespace VoiceFalloffOverride
                         yield break;
 
                     case "denied":
-                        VoiceFalloffOverrideMod.WorldType = 4;
-                        checkedWorlds.Add(worldId, 0);
+                        VoiceFalloffOverrideMod.WorldType = 3;
+                        checkedWorlds.Add(worldId, 3);
                         alreadyCheckingWorld = false;
                         //MelonLogger.Msg($"EmmVRC denies world '{worldId}'");
                         yield break;
