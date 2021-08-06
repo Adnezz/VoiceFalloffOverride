@@ -6,7 +6,7 @@ Built against and tested with MelonLoader v0.4.3, and VRChat Build 1121.
 Allows local customization of the distance values on player voices, AKA: the voice falloff distance.  
 Does NOT change how far other players hear voices travel, only changes what you hear.
 
-Also includes a fix for voice spatialization. A recent VRChat update disabled spatial audio on avatar voices, making voices very hard to localize in a crowd.
+Also includes a fix for voice spatialization. A recent VRChat update disabled spatial audio on avatar voices, making voices very hard to localize in a crowd. This may have been fixed as of 1121, so it is not enabled by default, but it's still there if you want to experiment.
 
 ## Background
 I wrote this because I often felt like I was drowning in voices when hanging out in a crowd in VRChat. I can't tell for certain, but it feels like voice localization and falloff has taken a turn for the worse over recent updates. With this mod, I can lower the distance and stay focused on the conversation I'm having with the people immediately around me.
@@ -30,6 +30,7 @@ This mod will not function in Game worlds or worlds on emmvrc's blacklist. In wo
 
 ## Credit
 This mod was built up from dave-kun's [RankVolumeControl](https://github.com/dave-kun/RankVolumeControl) and uses NetworkManagerHooks.cs from Knah's [JoinNotifier](https://github.com/knah/VRCMods/tree/master/JoinNotifier)
+Special thanks to lil-fluff for assistance in tracking down the cause of VFO failing to work in some worlds.
 
 
 
