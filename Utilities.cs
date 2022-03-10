@@ -173,13 +173,13 @@ namespace VoiceFalloffOverride
 
             //Assign values at start of world as default.
 
-            var BPAC = GameObject.Find("BetterPlayerAudioController");
+            /*var BPAC = GameObject.Find("BetterPlayerAudioController");
             if (BPAC != null)
             {
                 VoiceFalloffOverrideMod.HasBPAC = true;
                 VoiceFalloffOverrideMod.BPAC = BPAC;
                 MelonLogger.Msg("Found BetterPlayerAudioController in this world.");
-            }
+            }*/
 
 
             var PAM = VRCPlayer.field_Internal_Static_VRCPlayer_0.prop_PlayerAudioManager_0;
@@ -189,6 +189,27 @@ namespace VoiceFalloffOverride
             yield break;
         }
 
-        
+        internal static System.Collections.IEnumerator WaitForONSP(USpeaker us, float far_range, float near_range, float gain)
+        {
+            int count = 0;
+            //Wait for world type to populate and local player to exist.
+            while ((us.field_Private_ONSPAudioSource_0 == null) && (count < 10))
+            {
+                count++;
+                yield return new WaitForSecondsRealtime(1);
+            }
+            if (us.field_Private_ONSPAudioSource_0 != null)
+            {
+                ONSPAudioSource a2 = us.field_Private_ONSPAudioSource_0;
+                a2.far = far_range * 2;
+                a2.near = near_range * 2;
+                a2.gain = gain;
+            }
+            else
+                MelonDebug.Msg("Null ONSP timeout");
+            yield break;
+        }
+
+
     }
 }
