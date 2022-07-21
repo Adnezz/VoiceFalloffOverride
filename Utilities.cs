@@ -3,6 +3,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.Networking;
 using VRC.Core;
+using System.Net;
 
 
 using SIDictionary = System.Collections.Generic.Dictionary<string, int>;
@@ -102,7 +103,7 @@ namespace VoiceFalloffOverride
             alreadyCheckingWorld = true;
 
             // Check if black/whitelisted from EmmVRC - thanks Emilia and the rest of EmmVRC Staff
-            var uwr = UnityWebRequest.Get($"https://dl.emmvrc.com/riskyfuncs.php?worldid={worldId}");
+            var uwr = UnityWebRequest.Get($"https://prod-dl.emmvrc.com/risky_func/:{WebUtility.UrlEncode(worldId)}");
             uwr.SendWebRequest();
             while (!uwr.isDone)
                 yield return new WaitForEndOfFrame();
