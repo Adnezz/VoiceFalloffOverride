@@ -54,7 +54,7 @@ namespace VoiceFalloffOverride
         public const string Name = "Voice Falloff Override";
         public const string Author = "Adnezz";
         public const string Company = null;
-        public const string Version = "0.4.0";
+        public const string Version = "0.4.1";
         public const string DownloadLink = "https://github.com/Adnezz/VoiceFalloffOverride";
     }
 
