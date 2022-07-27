@@ -3,17 +3,7 @@
 
 This was a mod to legitimately help people, myself included. I'm done with VRChat, so I'm not hiding who I am anymore. Come ban me, assholes.
 
-
-
-
-
-
-
-
-
-
-
-
+#Original Readme Below
 
 Built against and tested with MelonLoader v0.5.3, and VRChat Build 1171.
 
